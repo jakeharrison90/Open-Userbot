@@ -52,9 +52,13 @@ async def language_status(_, message: Message):
 @Client.on_message(filters.text & auto_translate_filter)
 async def auto_translate(_, message: Message):
     """Automatically translate and edit messages in chats with a set language."""
+    if message.from_user and not message.from_user.is_self:
+        return
+
     lang_code = db.get("custom.translate", str(message.chat.id), None)
     if not lang_code:
         return
+
     try:
         response = requests.get(TRANSLATE_API.format(query=quote(message.text), lang=lang_code))
         response.raise_for_status()
