@@ -69,6 +69,10 @@ async def language_status(_, message: Message):
 @Client.on_message(filters.text & auto_translate_filter)
 async def auto_translate(_, message: Message):
     """Automatically translate and edit messages in chats with a set language."""
+    # Skip messages not sent by the user running the bot
+    if message.from_user and not message.from_user.is_self:
+        return
+
     lang_code = db.get("custom.gtranslate", str(message.chat.id), None)
     if not lang_code:
         return
