@@ -6,7 +6,7 @@ from pyrogram.filters import create
 from utils.misc import modules_help, prefix
 from utils.db import db
 
-TRANSLATE_API = "https://deliriussapi-oficial.vercel.app/tools/translate?text={query}&language={lang}"
+TRANSLATE_API = "https://delirius-apiofc.vercel.app/tools/translate?text={query}&language={lang}"
 
 def auto_translate_filter(_, __, message: Message):
     """Filter to process messages only if translation is enabled for the chat."""
