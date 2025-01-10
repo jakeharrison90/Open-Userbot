@@ -3,7 +3,7 @@ from pyrogram import Client, enums, filters
 from pyrogram.types import Message
 from utils.misc import modules_help, prefix
 
-GPT_API_URL = "https://deliriussapi-oficial.vercel.app/ia/gptweb?text="
+GPT_API_URL = "https://delirius-apiofc.vercel.app/ia/gptweb?text="
 
 async def fetch_gpt_response(query: str, message: Message, is_self: bool):
     """Fetch a response from the GPT API and send it to the user."""
