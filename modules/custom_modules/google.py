@@ -5,7 +5,7 @@ from pyrogram import Client, filters, enums
 from pyrogram.types import Message
 from utils.misc import modules_help, prefix
 
-GOOGLE_SEARCH_API = "https://deliriussapi-oficial.vercel.app/search/googlesearch?query="
+GOOGLE_SEARCH_API = "https://delirius-apiofc.vercel.app/search/googlesearch?query="
 APIFLASH_API_URL = "https://api.apiflash.com/v1/urltoimage"
 APIFLASH_API_KEY = "806cf941653948be8d8049defd086b82"
 
