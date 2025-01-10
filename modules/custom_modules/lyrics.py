@@ -34,7 +34,7 @@ async def lyrics_search(client, message: Message):
     if not query:
         await message.edit("Usage: lyrics <song name>")
         return
-    await search_lyrics("https://deliriussapi-oficial.vercel.app/search/letra?query=", format_lyrics_result, message, query)
+    await search_lyrics("https://delirius-apiofc.vercel.app/search/letra?query=", format_lyrics_result, message, query)
 
 modules_help["lyrics"] = {
   "lyrics [song name]*": "Get the lyrics of a song"
