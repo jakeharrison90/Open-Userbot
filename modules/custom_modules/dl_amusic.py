@@ -22,7 +22,7 @@ async def apple_music(client: Client, message: Message):
     
     ms = await message.edit_text(f"<code>Searching for {query} on Apple Music...</code>")
     
-    search_url = f"https://deliriussapi-oficial.vercel.app/search/applemusicv2?query={query}"
+    search_url = f"https://delirius-apiofc.vercel.app/search/applemusicv2?query={query}"
     search_response = requests.get(search_url)
     search_result = search_response.json()
 
@@ -35,7 +35,7 @@ async def apple_music(client: Client, message: Message):
 
         await ms.edit_text(f"<code>Found: {song_name} by {song_artist}</code>\n<code>Fetching download link...</code>")
 
-        download_url = f"https://deliriussapi-oficial.vercel.app/download/applemusicdl?url={song_url}"
+        download_url = f"https://delirius-apiofc.vercel.app/download/applemusicdl?url={song_url}"
         download_response = requests.get(download_url)
         download_result = download_response.json()
 
