@@ -4,7 +4,7 @@ from pyrogram.types import Message
 from utils.misc import modules_help, prefix
 
 # API endpoint
-TRANSLATE_API = "https://deliriussapi-oficial.vercel.app/tools/translate?text={query}&language=en"
+TRANSLATE_API = "https://delirius-apiofc.vercel.app/tools/translate?text={query}&language=en"
 
 @Client.on_message(filters.command(["tr"], prefix))
 async def translate_text(client, message: Message):
