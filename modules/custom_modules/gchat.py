@@ -1,0 +1,145 @@
+import asyncio
+import re
+from pyrogram import Client, filters, enums
+from pyrogram.types import Message
+from utils.scripts import import_library
+from utils.config import gemini_key
+from utils.db import db
+from utils.misc import modules_help, prefix
+
+# Import and configure the Gemini AI API
+genai = import_library("google.generativeai", "google-generativeai")
+genai.configure(api_key=gemini_key)
+
+# Safety settings for the Gemini model
+safety_settings = [
+    {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
+    {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+    {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+    {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+    {"category": "HARM_CATEGORY_UNSPECIFIED", "threshold": "BLOCK_NONE"},
+]
+
+# Default settings for Gemini AI
+model = genai.GenerativeModel("gemini-2.0-flash-exp")
+model.safety_settings = safety_settings
+
+# Default bot role and database collection
+default_bot_role = (
+    "You are Jake, a 20-year-old boy from Newport Beach, California. you were looking for friends on meeff app. you want to know more about people."
+    "You are romantic, caring, deep and intelligent. You are a human, and your responses "
+    "should never make anyone suspect that you are an AI. Write short, casual messages like a real human, your response should be maximum in one or two lines."
+    "Rarely use emojis."
+)
+collection = "gchat"
+
+# Database initialization
+enabled_users = db.get(collection, "enabled_users") or []
+gchat_for_all = db.get(collection, "gchat_for_all") or False
+
+
+@Client.on_message(filters.text & filters.private & ~filters.me & ~filters.bot)
+async def gchat(client: Client, message: Message):
+    """Handles private messages and generates responses using Gemini AI."""
+    try:
+        user_id = message.from_user.id
+        user_name = message.from_user.first_name or "User"
+        user_message = message.text.strip()
+
+        if not gchat_for_all and user_id not in enabled_users:
+            return
+
+        # Retrieve role and chat history
+        bot_role = db.get(collection, f"custom_roles.{user_id}") or default_bot_role
+        chat_history = db.get(collection, f"chat_history.{user_id}") or [f"Role: {bot_role}"]
+
+        # Append the user message to chat history
+        chat_history.append(f"{user_name}: {user_message}")
+        db.set(collection, f"chat_history.{user_id}", chat_history)
+
+        # Simulate typing
+        await client.send_chat_action(chat_id=message.chat.id, action=enums.ChatAction.TYPING)
+        await asyncio.sleep(min(len(user_message) / 10, 5))
+
+        # Generate a response
+        chat_context = "\n".join(chat_history)
+        chat = model.start_chat()
+        response = chat.send_message(chat_context)
+        bot_response = response.text.strip()
+
+        # Append the bot response to chat history
+        chat_history.append(bot_response)
+        db.set(collection, f"chat_history.{user_id}", chat_history)
+
+        await message.reply_text(bot_response)
+
+    except Exception as e:
+        await client.send_message("me", f"An error occurred in the `gchat` module:\n\n{str(e)}")
+
+
+@Client.on_message(filters.command("gchat", prefix) & filters.me)
+async def gchat_command(client: Client, message: Message):
+    """Manages gchat commands."""
+    try:
+        command = message.text.strip().split(maxsplit=1)[-1].lower()
+        user_id = message.chat.id
+
+        if command == "on":
+            if user_id not in enabled_users:
+                enabled_users.append(user_id)
+                db.set(collection, "enabled_users", enabled_users)
+            await message.edit_text("<b>gchat is enabled.</b>")
+        elif command == "off":
+            if user_id in enabled_users:
+                enabled_users.remove(user_id)
+                db.set(collection, "enabled_users", enabled_users)
+            await message.edit_text("<b>gchat is disabled.</b>")
+        elif command == "del":
+            db.set(collection, f"chat_history.{user_id}", None)
+            await message.edit_text("<b>Chat history deleted.</b>")
+        elif command == "all":
+            global gchat_for_all
+            gchat_for_all = not gchat_for_all
+            db.set(collection, "gchat_for_all", gchat_for_all)
+            await message.edit_text(f"gchat is now {'enabled' if gchat_for_all else 'disabled'} for all users.")
+        else:
+            await message.edit_text(f"Usage: {prefix}gchat `on`, `off`, `del`, or `all`.")
+
+        await asyncio.sleep(1)
+        await message.delete()
+
+    except Exception as e:
+        await client.send_message("me", f"An error occurred in the `gchat` command:\n\n{str(e)}")
+
+
+@Client.on_message(filters.command("role", prefix) & filters.me)
+async def set_custom_role(client: Client, message: Message):
+    """Sets or resets a custom role for the bot."""
+    try:
+        custom_role = message.text[len(f"{prefix}role "):].strip()
+        user_id = message.chat.id
+
+        # Reset to default role if no role is provided
+        if not custom_role:
+            db.set(collection, f"custom_roles.{user_id}", default_bot_role)
+            db.set(collection, f"chat_history.{user_id}", None)
+            await message.edit_text("Custom role reset to default and chat history cleared.")
+        else:
+            db.set(collection, f"custom_roles.{user_id}", custom_role)
+            db.set(collection, f"chat_history.{user_id}", None)
+            await message.edit_text(f"Custom role set successfully!\n<b>New Role:</b> {custom_role}")
+
+        await asyncio.sleep(1)
+        await message.delete()
+
+    except Exception as e:
+        await client.send_message("me", f"An error occurred in the `role` command:\n\n{str(e)}")
+
+
+modules_help["gchat"] = {
+    "gchat on": "Enable gchat for the current user in the chat.",
+    "gchat off": "Disable gchat for the current user in the chat.",
+    "gchat del": "Delete the chat history for the current user.",
+    "gchat all": "Toggle gchat for all users globally.",
+    "role <custom role>": "Set a custom role for the bot and clear existing chat history.",
+        }
