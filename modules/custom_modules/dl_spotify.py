@@ -23,7 +23,7 @@ async def spotify_download(client: Client, message: Message):
 
     ms = await message.edit_text(f"<code>Searching for {query} on Spotify...</code>")
 
-    search_url = f"https://deliriussapi-oficial.vercel.app/search/spotify?q={query}&limit=2"
+    search_url = f"https://delirius-apiofc.vercel.app/search/spotify?q={query}&limit=2"
     search_response = requests.get(search_url)
     search_result = search_response.json()
 
@@ -36,7 +36,7 @@ async def spotify_download(client: Client, message: Message):
 
         await ms.edit_text(f"<code>Found: {song_name} by {song_artist}</code>\n<code>Fetching download link...</code>")
 
-        download_url = f"https://deliriussapi-oficial.vercel.app/download/spotifydlv3?url={song_url}"
+        download_url = f"https://delirius-apiofc.vercel.app/download/spotifydlv3?url={song_url}"
         download_response = requests.get(download_url)
         download_result = download_response.json()
 
