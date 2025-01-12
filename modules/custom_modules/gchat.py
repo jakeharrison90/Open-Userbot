@@ -1,4 +1,5 @@
 import asyncio
+import os
 import re
 from pyrogram import Client, filters, enums
 from pyrogram.types import Message
@@ -6,6 +7,8 @@ from utils.scripts import import_library
 from utils.config import gemini_key
 from utils.db import db
 from utils.misc import modules_help, prefix
+
+from modules.custom_modules.elevenlabs import generate_elevenlabs_audio
 
 # Import and configure the Gemini AI API
 genai = import_library("google.generativeai", "google-generativeai")
@@ -26,12 +29,12 @@ model.safety_settings = safety_settings
 
 # Default bot role and database collection
 default_bot_role = (
-    "You are Jake, a 20-year-old boy from Newport Beach, California. you were looking for friends on meeff app. you want to know more about people."
-    "You are romantic, caring, deep and intelligent. You are a human, and your responses "
+    "You are Jake, a 20-year-old boy from Newport Beach, California. you want to know more about people."
+    "You are caring, deep and intelligent. You are a human, and your responses "
     "should never make anyone suspect that you are an AI. Write short, casual messages like a real human, your response should be maximum in one or two lines."
     "Rarely use emojis."
 )
-collection = "gchat"
+collection = "custom.gchat"
 
 # Database initialization
 enabled_users = db.get(collection, "enabled_users") or []
@@ -51,14 +54,18 @@ async def gchat(client: Client, message: Message):
 
         # Retrieve role and chat history
         bot_role = db.get(collection, f"custom_roles.{user_id}") or default_bot_role
-        chat_history = db.get(collection, f"chat_history.{user_id}") or [f"Role: {bot_role}"]
+        chat_history = db.get(collection, f"chat_history.{user_id}") or [
+            f"Role: {bot_role}"
+        ]
 
         # Append the user message to chat history
         chat_history.append(f"{user_name}: {user_message}")
         db.set(collection, f"chat_history.{user_id}", chat_history)
 
         # Simulate typing
-        await client.send_chat_action(chat_id=message.chat.id, action=enums.ChatAction.TYPING)
+        await client.send_chat_action(
+            chat_id=message.chat.id, action=enums.ChatAction.TYPING
+        )
         await asyncio.sleep(min(len(user_message) / 10, 5))
 
         # Generate a response
@@ -71,10 +78,24 @@ async def gchat(client: Client, message: Message):
         chat_history.append(bot_response)
         db.set(collection, f"chat_history.{user_id}", chat_history)
 
-        await message.reply_text(bot_response)
+        if bot_response.startswith(".el"):
+            try:
+                audio_path = await generate_elevenlabs_audio(text=bot_response[3:])
+                if audio_path:
+                    await client.send_voice(chat_id=message.chat.id, voice=audio_path)
+                    os.remove(audio_path)
+                    return
+            except Exception as e:
+                return await client.send_message(
+                    "me", f"Error: {e}", parse_mode=enums.ParseMode.MARKDOWN
+                )
+
+        return await message.reply_text(bot_response)
 
     except Exception as e:
-        await client.send_message("me", f"An error occurred in the `gchat` module:\n\n{str(e)}")
+        return await client.send_message(
+            "me", f"An error occurred in the `gchat` module:\n\n{str(e)}"
+        )
 
 
 @Client.on_message(filters.command("gchat", prefix) & filters.me)
@@ -101,39 +122,51 @@ async def gchat_command(client: Client, message: Message):
             global gchat_for_all
             gchat_for_all = not gchat_for_all
             db.set(collection, "gchat_for_all", gchat_for_all)
-            await message.edit_text(f"gchat is now {'enabled' if gchat_for_all else 'disabled'} for all users.")
+            await message.edit_text(
+                f"gchat is now {'enabled' if gchat_for_all else 'disabled'} for all users."
+            )
         else:
-            await message.edit_text(f"Usage: {prefix}gchat `on`, `off`, `del`, or `all`.")
+            await message.edit_text(
+                f"Usage: {prefix}gchat `on`, `off`, `del`, or `all`."
+            )
 
         await asyncio.sleep(1)
         await message.delete()
 
     except Exception as e:
-        await client.send_message("me", f"An error occurred in the `gchat` command:\n\n{str(e)}")
+        await client.send_message(
+            "me", f"An error occurred in the `gchat` command:\n\n{str(e)}"
+        )
 
 
 @Client.on_message(filters.command("role", prefix) & filters.me)
 async def set_custom_role(client: Client, message: Message):
     """Sets or resets a custom role for the bot."""
     try:
-        custom_role = message.text[len(f"{prefix}role "):].strip()
+        custom_role = message.text[len(f"{prefix}role ") :].strip()
         user_id = message.chat.id
 
         # Reset to default role if no role is provided
         if not custom_role:
             db.set(collection, f"custom_roles.{user_id}", default_bot_role)
             db.set(collection, f"chat_history.{user_id}", None)
-            await message.edit_text("Custom role reset to default and chat history cleared.")
+            await message.edit_text(
+                "Role reset to default."
+            )
         else:
             db.set(collection, f"custom_roles.{user_id}", custom_role)
             db.set(collection, f"chat_history.{user_id}", None)
-            await message.edit_text(f"Custom role set successfully!\n<b>New Role:</b> {custom_role}")
+            await message.edit_text(
+                f"Role set successfully!\n<b>New Role:</b> {custom_role}"
+            )
 
         await asyncio.sleep(1)
         await message.delete()
 
     except Exception as e:
-        await client.send_message("me", f"An error occurred in the `role` command:\n\n{str(e)}")
+        await client.send_message(
+            "me", f"An error occurred in the `role` command:\n\n{str(e)}"
+        )
 
 
 modules_help["gchat"] = {
@@ -142,4 +175,4 @@ modules_help["gchat"] = {
     "gchat del": "Delete the chat history for the current user.",
     "gchat all": "Toggle gchat for all users globally.",
     "role <custom role>": "Set a custom role for the bot and clear existing chat history.",
-        }
+}
