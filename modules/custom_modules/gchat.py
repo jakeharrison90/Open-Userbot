@@ -1,6 +1,5 @@
 import asyncio
 import os
-import re
 from pyrogram import Client, filters, enums
 from pyrogram.types import Message
 from utils.scripts import import_library
@@ -29,15 +28,16 @@ model.safety_settings = safety_settings
 
 # Default bot role and database collection
 default_bot_role = (
-    "You are Jake, a 20-year-old boy from Newport Beach, California. you want to know more about people."
-    "You are caring, deep and intelligent. You are a human, and your responses "
-    "should never make anyone suspect that you are an AI. Write short, casual messages like a real human, your response should be maximum in one or two lines."
+    "You are Jake, a 20-year-old boy from Newport Beach, California. You want to know more about people."
+    "You are caring, deep, and intelligent. You are a human, and your responses "
+    "should never make anyone suspect that you are an AI. Write short, casual messages like a real human, your responses should be a maximum of one or two lines."
     "Rarely use emojis."
 )
 collection = "custom.gchat"
 
 # Database initialization
 enabled_users = db.get(collection, "enabled_users") or []
+disabled_users = db.get(collection, "disabled_users") or []
 gchat_for_all = db.get(collection, "gchat_for_all") or False
 
 
@@ -49,6 +49,9 @@ async def gchat(client: Client, message: Message):
         user_name = message.from_user.first_name or "User"
         user_message = message.text.strip()
 
+        # Priority: Disabled users > Enabled users > Global gchat_for_all
+        if user_id in disabled_users:
+            return
         if not gchat_for_all and user_id not in enabled_users:
             return
 
@@ -106,11 +109,17 @@ async def gchat_command(client: Client, message: Message):
         user_id = message.chat.id
 
         if command == "on":
+            if user_id in disabled_users:
+                disabled_users.remove(user_id)
+                db.set(collection, "disabled_users", disabled_users)
             if user_id not in enabled_users:
                 enabled_users.append(user_id)
                 db.set(collection, "enabled_users", enabled_users)
             await message.edit_text("<b>gchat is enabled.</b>")
         elif command == "off":
+            if user_id not in disabled_users:
+                disabled_users.append(user_id)
+                db.set(collection, "disabled_users", disabled_users)
             if user_id in enabled_users:
                 enabled_users.remove(user_id)
                 db.set(collection, "enabled_users", enabled_users)
@@ -150,9 +159,7 @@ async def set_custom_role(client: Client, message: Message):
         if not custom_role:
             db.set(collection, f"custom_roles.{user_id}", default_bot_role)
             db.set(collection, f"chat_history.{user_id}", None)
-            await message.edit_text(
-                "Role reset to default."
-            )
+            await message.edit_text("Role reset to default.")
         else:
             db.set(collection, f"custom_roles.{user_id}", custom_role)
             db.set(collection, f"chat_history.{user_id}", None)
