@@ -1,5 +1,6 @@
 import asyncio
 import os
+import random
 from pyrogram import Client, filters, enums
 from pyrogram.types import Message
 from utils.scripts import import_library
@@ -64,6 +65,10 @@ async def gchat(client: Client, message: Message):
         # Append the user message to chat history
         chat_history.append(f"{user_name}: {user_message}")
         db.set(collection, f"chat_history.{user_id}", chat_history)
+
+        # Add random delay before simulating typing
+        delay = random.choice([5, 10, 12])
+        await asyncio.sleep(delay)
 
         # Simulate typing
         await client.send_chat_action(
