@@ -76,29 +76,48 @@ async def gchat(client: Client, message: Message):
         )
         await asyncio.sleep(min(len(user_message) / 10, 5))
 
-        # Generate a response
-        chat_context = "\n".join(chat_history)
-        chat = model.start_chat()
-        response = chat.send_message(chat_context)
-        bot_response = response.text.strip()
-
-        # Append the bot response to chat history
-        chat_history.append(bot_response)
-        db.set(collection, f"chat_history.{user_id}", chat_history)
-
-        if bot_response.startswith(".el"):
+        # Retry logic for handling 429 errors
+        retries = 3
+        while retries > 0:
             try:
-                audio_path = await generate_elevenlabs_audio(text=bot_response[3:])
-                if audio_path:
-                    await client.send_voice(chat_id=message.chat.id, voice=audio_path)
-                    os.remove(audio_path)
-                    return
-            except Exception as e:
-                return await client.send_message(
-                    "me", f"Error: {e}", parse_mode=enums.ParseMode.MARKDOWN
-                )
+                # Generate a response
+                chat_context = "\n".join(chat_history)
+                chat = model.start_chat()
+                response = chat.send_message(chat_context)
+                bot_response = response.text.strip()
 
-        return await message.reply_text(bot_response)
+                # Append the bot response to chat history
+                chat_history.append(bot_response)
+                db.set(collection, f"chat_history.{user_id}", chat_history)
+
+                # Check for ElevenLabs voice message
+                if bot_response.startswith(".el"):
+                    try:
+                        audio_path = await generate_elevenlabs_audio(
+                            text=bot_response[3:]
+                        )
+                        if audio_path:
+                            await client.send_voice(
+                                chat_id=message.chat.id, voice=audio_path
+                            )
+                            os.remove(audio_path)
+                            return
+                    except Exception as e:
+                        return await client.send_message(
+                            "me", f"Error: {e}", parse_mode=enums.ParseMode.MARKDOWN
+                        )
+
+                return await message.reply_text(bot_response)
+
+            except Exception as e:
+                # Check if the error is due to rate limits
+                if "429" in str(e):
+                    retries -= 1
+                    backoff = random.uniform(5, 10)
+                    await asyncio.sleep(backoff)
+                    continue
+                # If it's not a 429 error, raise the exception
+                raise e
 
     except Exception as e:
         return await client.send_message(
